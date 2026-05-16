@@ -1,105 +1,56 @@
 #!/usr/bin/env python3
+"""
+Command-line activity launcher for the AV control system.
 
-import socket
-import time
+This uses the same scene definitions as the web service:
+- HDMI Output 1 is unused.
+- HDMI Output 2 is the active route for every HDMI source.
+- LS28SE input and startup volume are applied with each scene.
+"""
 
-HOST = "192.168.1.254"
-PORT = 4001
-TIMEOUT = 3.0
+from __future__ import annotations
 
-def send(cmd):
-
-    try:
-
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        s.settimeout(TIMEOUT)
-
-        s.connect((HOST, PORT))
-
-        full = cmd + "\n"
-
-        print(f"SENDING: {full.strip()}")
-
-        s.sendall(full.encode("ascii"))
-
-        time.sleep(0.4)
-
-        try:
-
-            response = s.recv(4096)
-
-            if response:
-
-                print("RESPONSE:", response.decode(errors="ignore"))
-
-        except:
-
-            pass
-
-        s.close()
-
-    except Exception as e:
-
-        print("ERROR:", e)
+from av_proxy import ACTIVE_MATRIX_OUTPUT, SCENES, run_scene
 
 
-def activity_hifi_rose():
-
-    send("INPUT SET BAL1")
-    time.sleep(0.5)
-
-    send("VOLUME SET 18")
-    time.sleep(0.5)
-
-    send("MUTE OFF")
+MENU = {
+    "1": "rose",
+    "2": "roon",
+    "3": "roku",
+    "4": "apple",
+}
 
 
-def activity_roon_bacch():
+def print_menu() -> None:
+    print("\nAVAILABLE ACTIVITIES:\n")
+    for key, scene_name in MENU.items():
+        scene = SCENES[scene_name]
+        print(
+            f"{key} = {scene['label']} "
+            f"(HDMI IN{scene['hdmi']} -> OUT{ACTIVE_MATRIX_OUTPUT}, "
+            f"Preamp {scene['preamp']}, Vol {scene['volume']})"
+        )
+    print("")
 
-    send("INPUT SET BAL2")
-    time.sleep(0.5)
 
-    send("VOLUME SET 18")
-    time.sleep(0.5)
+def main() -> None:
+    print_menu()
+    choice = input("Select Activity: ").strip()
+    scene_name = MENU.get(choice)
 
-    send("MUTE OFF")
+    if not scene_name:
+        print("Invalid choice")
+        return
 
+    print(f"Running scene: {SCENES[scene_name]['label']}")
+    result = run_scene(scene_name)
 
-def activity_roku_apple():
-
-    send("INPUT SET BAL3")
-    time.sleep(0.5)
-
-    send("VOLUME SET 18")
-    time.sleep(0.5)
-
-    send("MUTE OFF")
+    print("Done.")
+    print(f"Matrix responses: {result['hdmi']['responses']}")
+    print(f"Preamp input: {result['preamp_input']['response'].strip()}")
+    print(f"Volume: {result['volume']['response'].strip()}")
+    print(f"Mute: {result['mute']['response'].strip()}")
 
 
 if __name__ == "__main__":
-
-    print("\nAVAILABLE ACTIVITIES:\n")
-
-    print("1 = HiFi Rose")
-    print("2 = Roon/BACCH")
-    print("3 = Roku-Apple\n")
-
-    choice = input("Select Activity: ").strip()
-
-    if choice == "1":
-
-        activity_hifi_rose()
-
-    elif choice == "2":
-
-        activity_roon_bacch()
-
-    elif choice == "3":
-
-        activity_roku_apple()
-
-    else:
-
-        print("Invalid choice")
-
+    main()
