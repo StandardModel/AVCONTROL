@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>AV Control SCENE V13</title>
+<title>AV Control SCENE V14</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Rajdhani:wght@400;500;600;700&display=swap');
 
@@ -254,7 +254,7 @@
 <body>
 
 <header>
-  <div class="logo">AV<span>•</span>CTL <b class="version-pill">SCENE V13</b></div>
+  <div class="logo">AV<span>•</span>CTL <b class="version-pill">SCENE V14</b></div>
   <div class="status-pill">
     <span class="status-dot" id="statusDot"></span>
     <span id="statusLabel">connecting</span>
@@ -462,7 +462,7 @@
 </main>
 
 <script>
-const PANEL_VERSION = '2026-05-17 scenes v13';
+const PANEL_VERSION = '2026-05-17 scenes v14 (preamp retry)';
 const PROXY = window.location.protocol.startsWith('http')
   ? window.location.origin
   : 'http://192.168.1.60:8765';
@@ -526,6 +526,20 @@ async function tcpSend(dev, cmd) {
   }
 }
 
+// Send to a device with one automatic retry on transient failure
+// (502/connection error). Helps with the preamp serial-to-IP bridge
+// which sometimes refuses back-to-back connections during scenes.
+async function tcpSendRetry(dev, cmd, label='command', retryDelay=700) {
+  let resp = await tcpSend(dev, cmd);
+  if (resp === null) {
+    log(`${label}: retrying in ${retryDelay}ms...`,'dim');
+    await wait(retryDelay);
+    resp = await tcpSend(dev, cmd);
+    if (resp !== null) log(`${label}: retry succeeded`,'ok');
+  }
+  return resp;
+}
+
 async function apiPost(path, payload) {
   try {
     const r = await fetch(`${PROXY}${path}`, {
@@ -574,8 +588,9 @@ async function selectScene(key) {
 
     await wait(500);
 
-    const inputResp = await tcpSend(PREAMP, `INPUT SET ${s.preamp}\n`);
+    const inputResp = await tcpSendRetry(PREAMP, `INPUT SET ${s.preamp}\n`, `Preamp INPUT SET ${s.preamp}`);
     if (inputResp !== null) { log('Preamp ← '+inputResp.trim(),'ok'); parsePreampResponse(inputResp); }
+    else log(`Preamp INPUT SET ${s.preamp}: failed after retry`,'err');
 
     await wait(500);
 
@@ -583,11 +598,13 @@ async function selectScene(key) {
 
     await wait(500);
 
-    const muteResp = await tcpSend(PREAMP, 'MUTE OFF\n');
+    const muteResp = await tcpSendRetry(PREAMP, 'MUTE OFF\n', 'Preamp MUTE OFF');
     if (muteResp !== null) {
       log('Mute off','ok');
       updateToggle('btn-mute',false,'danger-on');
       updateToggle('btn-mute2',false,'danger-on');
+    } else {
+      log('Preamp MUTE OFF: failed after retry','err');
     }
 
     document.querySelectorAll('.scene-btn').forEach(b => b.classList.remove('active'));
