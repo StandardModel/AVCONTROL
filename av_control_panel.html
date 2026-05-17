@@ -834,18 +834,36 @@ async function preampDisplay(level) {
 }
 
 async function init() {
-  setStatus(false,'connecting');
-  updateVolume(START_VOLUME);
-  log(`Panel loaded: ${PANEL_VERSION}`,'dim');
-  log('Fetching device status...','dim');
-  const [sta,m2] = await Promise.all([
-    tcpSend(PREAMP,'STATUS ALL ?\n'),
-    tcpSend(MATRIX,'GET OUT2 VS\r\n'),
-  ]);
-  if (sta) { parsePreampResponse(sta, {volume:false}); log('Preamp ready','ok'); }
-  log('Matrix OUT1: unused','dim');
-  if (m1)  log('Matrix OUT2: '+m1.trim(),'ok');
-  await setPreampVolume(START_VOLUME, 'Startup volume');
+  try {
+    setStatus(false,'connecting');
+    updateVolume(START_VOLUME);
+    log(`Panel loaded: ${PANEL_VERSION}`,'dim');
+    log(`Proxy: ${PROXY}`,'dim');
+
+    // Quick self-test: confirm the new /api/matrix endpoint is reachable.
+    // If the proxy is an old build that lacks it, the user sees an explicit error.
+    try {
+      const statusResp = await fetch(`${PROXY}/api/status`, {cache:'no-store'});
+      if (!statusResp.ok) throw new Error('HTTP '+statusResp.status);
+      const statusJson = await statusResp.json();
+      log(`Proxy OK · active HDMI OUT${statusJson.active_hdmi_output}`,'ok');
+    } catch (e) {
+      log('Proxy /api/status failed: '+e.message+' — matrix calls may fail. Force-refresh the iPad.','err');
+    }
+
+    log('Fetching device status...','dim');
+    const [sta,m2] = await Promise.all([
+      tcpSend(PREAMP,'STATUS ALL ?\n'),
+      tcpSend(MATRIX,'GET OUT2 VS\r\n'),
+    ]);
+    if (sta) { parsePreampResponse(sta, {volume:false}); log('Preamp ready','ok'); }
+    log('Matrix OUT1: unused','dim');
+    if (m2)  log('Matrix OUT2: '+m2.trim(),'ok');
+    await setPreampVolume(START_VOLUME, 'Startup volume');
+  } catch (e) {
+    log('init() error: '+e.message,'err');
+    setStatus(false,'init error');
+  }
 }
 
 window.addEventListener('load', init);
