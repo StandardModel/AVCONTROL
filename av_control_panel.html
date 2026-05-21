@@ -322,6 +322,16 @@
         <div class="toggle-btn" id="btn-mute2" onclick="preampToggle('MUTE','btn-mute','btn-mute2')">Mute</div>
       </div>
     </div>
+
+    <div class="card">
+      <div class="card-title purple">Balance</div>
+      <div class="balance-row">
+        <span class="balance-label">L</span>
+        <input type="range" min="-22" max="22" step="1" value="0" id="balSlider2" oninput="preampBalSet(this.value)" onchange="preampBalSet(this.value)">
+        <span class="balance-label">R</span>
+        <span class="balance-val" id="balVal2">0</span>
+      </div>
+    </div>
   </div>
 
   <!-- MATRIX TAB -->
@@ -693,8 +703,13 @@ function updatePreampInput(inp) {
 }
 
 function updateBalance(b) {
+  const label = b>0?'+'+b:String(b);
   document.getElementById('balSlider').value = b;
-  document.getElementById('balVal').textContent = b>0?'+'+b:b;
+  document.getElementById('balVal').textContent = label;
+  const s2 = document.getElementById('balSlider2');
+  const v2 = document.getElementById('balVal2');
+  if (s2) s2.value = b;
+  if (v2) v2.textContent = label;
 }
 
 function updateDisplay(d) {
