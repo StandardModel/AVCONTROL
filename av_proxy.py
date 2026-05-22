@@ -18,6 +18,7 @@ import os
 import socket
 import time
 import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -160,6 +161,37 @@ def retry_tcp(device: TcpDevice, command: str, attempts: int = 2, delay: float =
     return responses
 
 
+def http_get(device: TcpDevice, path: str, timeout: float = 3.0) -> str:
+    url = f"http://{device.host}{path}"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            return response.read().decode("ascii", errors="replace")
+    except OSError as exc:
+        raise RuntimeError(f"HTTP error connecting to {url}: {exc}") from exc
+
+
+def matrix_http_status(output: int) -> str:
+    response = http_get(MATRIX, f"/VIDDivSta.CGI?{time.time()}", timeout=2.0)
+    route_prefix = f"O{output}I"
+
+    for token in response.removeprefix("VidSta=").split("&"):
+        if token.startswith(route_prefix):
+            return f"OUT{output} VS IN{token[-1]}"
+
+    raise RuntimeError(f"Matrix HTTP status missing route for OUT{output}: {response}")
+
+
+def matrix_http_route(output: int, input_number: int) -> dict[str, Any]:
+    button = urllib.parse.quote_plus(f"O{output}I{input_number}")
+    response = http_get(MATRIX, f"/TimSendCmd.CGI?button={button}+{time.time()}", timeout=2.0)
+    status = matrix_http_status(output)
+    return {
+        "command": f"HTTP O{output}I{input_number}",
+        "responses": [response, status],
+        "transport": "http",
+    }
+
+
 def send_ir(command: str) -> list[str]:
     if command not in IR_CODES:
         raise ValueError(f"Unknown IR command: {command}")
@@ -179,8 +211,13 @@ def matrix_route(output: int, input_number: int, attempts: int = 2) -> dict[str,
         raise ValueError("HDMI input must be 1-4")
 
     command = f"SET OUT{output} VS IN{input_number}"
-    responses = retry_tcp(MATRIX, command, attempts=attempts)
-    return {"command": command, "responses": responses}
+    try:
+        responses = retry_tcp(MATRIX, command, attempts=attempts)
+        return {"command": command, "responses": responses, "transport": "tcp"}
+    except RuntimeError as exc:
+        result = matrix_http_route(output, input_number)
+        result["tcp_error"] = str(exc)
+        return result
 
 
 def preamp_command(data: dict[str, Any]) -> dict[str, Any]:
@@ -380,6 +417,13 @@ class ProxyHandler(BaseHTTPRequestHandler):
             (ITACH.host, ITACH.port): ITACH,
         }
         device = known.get((host, port), TcpDevice("custom", host, port, ""))
+
+        if device == MATRIX:
+            query = command.strip().upper()
+            if query.startswith("GET OUT") and query.endswith(" VS"):
+                output = int(query.removeprefix("GET OUT").removesuffix(" VS"))
+                return {"response": matrix_http_status(output)}
+
         response = tcp_send(device, command)
         return {"response": response}
 
