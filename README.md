@@ -17,13 +17,13 @@ python3 /Users/roncompton/AVCONTROL/av_proxy.py
 Open the panel:
 
 ```text
-http://<mac-ip>:8765/panel
+http://<mac-ip>:9090/panel
 ```
 
 Health check:
 
 ```text
-http://<mac-ip>:8765/health
+http://<mac-ip>:9090/health
 ```
 
 ## Run as a Mac Service

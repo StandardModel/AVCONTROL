@@ -8,7 +8,7 @@ Usage:
     python3 av_proxy.py
 
 Open:
-    http://<your-mac-ip>:8765/panel
+    http://<your-mac-ip>:9090/panel
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 
-PROXY_PORT = int(os.environ.get("AV_PROXY_PORT", "8765"))
+PROXY_PORT = int(os.environ.get("AV_PROXY_PORT", "9090"))
 PANEL_FILE = Path(__file__).parent / "av_control_panel.html"
 
 
