@@ -133,6 +133,12 @@ def minidsp_coefficients(spec: FilterSpec) -> tuple[float, float, float, float, 
     return (b[0], b[1], b[2], -a[1], -a[2])
 
 
+def fmt_coeff(value: float) -> str:
+    if abs(value) < 5e-16:
+        return "0"
+    return f"{value:.15g}"
+
+
 def padded_specs(specs: list[FilterSpec]) -> list[FilterSpec]:
     padded = specs[:]
     while len(padded) < 10:
@@ -158,11 +164,11 @@ def write_biquad_file(name: str, specs: list[FilterSpec]) -> None:
         lines.extend(
             [
                 f"biquad{idx},",
-                f"b0={b0:.15g},",
-                f"b1={b1:.15g},",
-                f"b2={b2:.15g},",
-                f"a1={a1:.15g},",
-                f"a2={a2:.15g},",
+                f"b0={fmt_coeff(b0)},",
+                f"b1={fmt_coeff(b1)},",
+                f"b2={fmt_coeff(b2)},",
+                f"a1={fmt_coeff(a1)},",
+                f"a2={fmt_coeff(a2)},",
             ]
         )
     lines[-1] = lines[-1].rstrip(",")
